@@ -1,0 +1,6 @@
+# 临时与自检文件
+_shots/
+_backup/
+_*.png
+_*.html
+.DS_Store

@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StyleCam · 风格调色盘</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23e53935'/%3E%3C/svg%3E">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; overflow: hidden; background: #000;
+  font-family: -apple-system, "SF Pro Display", "PingFang SC", "Noto Sans SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input[type="file"] { display: none; }
+
+/* ===== 顶部导航 ===== */
+#nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  height: 60px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px;
+}
+#nav-brand {
+  font-size: 20px; font-weight: 300; color: #fff; letter-spacing: .5px;
+}
+#nav-brand span { font-size: 11px; color: rgba(255,255,255,.4); margin-left: 6px; }
+
+#nav-center {
+  display: flex; background: rgba(255,255,255,.1); border-radius: 24px;
+  padding: 4px; backdrop-filter: blur(10px);
+}
+.nav-tab {
+  padding: 8px 28px; border-radius: 20px; font-size: 13px;
+  color: rgba(255,255,255,.6); transition: all .25s;
+}
+.nav-tab.active {
+  background: rgba(255,255,255,.15); color: #fff;
+}
+#nav-right { display: flex; align-items: center; gap: 20px; }
+#nav-right button {
+  color: rgba(255,255,255,.6); font-size: 13px;
+  display: flex; align-items: center; gap: 6px;
+}
+#nav-plus {
+  width: 28px; height: 28px; font-size: 20px; color: rgba(255,255,255,.6);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ===== 散落照片（拍立得） ===== */
+.polaroid {
+  position: absolute; background: #fff; padding: 10px 10px 30px;
+  border-radius: 3px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  cursor: pointer; transition: transform .4s cubic-bezier(.34,1.4,.48,1), box-shadow .3s;
+}
+.polaroid:hover {
+  transform: rotate(0deg) scale(1.08) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  z-index: 30;
+}
+.polaroid img {
+  display: block; width: 100%; height: auto; border-radius: 1px;
+  object-fit: cover;
+}
+.polaroid .cap {
+  position: absolute; bottom: 8px; left: 0; right: 0;
+  text-align: center; font-size: 9px; color: rgba(0,0,0,.4);
+}
+
+/* 照片定位（模拟散落布局） */
+#photo-main {
+  width: 220px; top: 12%; left: 50%; transform: translateX(-50%);
+  z-index: 10;
+}
+#photo-tl1 { width: 150px; top: 12%; left: 6%; transform: rotate(-8deg); z-index: 5; }
+#photo-tl2 { width: 130px; top: 10%; left: 18%; transform: rotate(6deg); z-index: 4; }
+#photo-tr1 { width: 150px; top: 12%; right: 18%; transform: rotate(-5deg); z-index: 5; }
+#photo-tr2 { width: 140px; top: 11%; right: 5%; transform: rotate(8deg); z-index: 4; }
+
+/* 底部散落照片 */
+#photo-b1 { width: 110px; bottom: 8%; left: 7%; transform: rotate(-6deg); }
+#photo-b2 { width: 120px; bottom: 5%; left: 17%; transform: rotate(4deg); }
+#photo-b3 { width: 100px; bottom: 10%; left: 27%; transform: rotate(-3deg); }
+#photo-b4 { width: 130px; bottom: 7%; left: 40%; transform: rotate(5deg); }
+#photo-b5 { width: 120px; bottom: 6%; left: 54%; transform: rotate(-7deg); }
+#photo-b6 { width: 115px; bottom: 9%; left: 68%; transform: rotate(3deg); }
+#photo-b7 { display: none; }
+
+/* ===== 中央白色卡片（打印机） ===== */
+#printer-card {
+  position: absolute; top: 50%; left: 50%; z-index: 20;
+  transform: translate(-50%, -45%);
+  width: 680px; height: 260px;
+  background: linear-gradient(160deg, #f5f3f7, #eae8ee);
+  border-radius: 32px;
+  box-shadow:
+    0 40px 120px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.8);
+  display: flex; align-items: center; padding: 36px 44px; gap: 32px;
+}
+
+/* 左侧文字信息 */
+#printer-info { flex: 1; padding-right: 96px; }
+#status-dot {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+}
+#status-dot .led {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #00c853; box-shadow: 0 0 8px rgba(0,200,83,.5);
+}
+#status-dot .en-label {
+  font-size: 10px; color: rgba(0,0,0,.35);
+  letter-spacing: 2px; font-weight: 500;
+}
+#style-title {
+  font-size: 26px; font-weight: 400; color: #1a1a2e;
+  margin-bottom: 10px; letter-spacing: 1px;
+}
+#style-desc {
+  font-size: 13px; color: rgba(0,0,0,.45); line-height: 1.7;
+  margin-bottom: 20px;
+}
+#printer-links { display: flex; gap: 24px; align-items: center; }
+.p-link {
+  font-size: 12px; color: rgba(0,0,0,.4);
+  display: flex; align-items: center; gap: 4px;
+  transition: color .2s;
+}
+.p-link:hover { color: rgba(0,0,0,.7); }
+.p-link svg { width: 12px; height: 12px; }
+
+/* ===== 圆形转盘（围绕旋钮） ===== */
+#dial {
+  position: relative; width: 68px; height: 68px; flex-shrink: 0;
+}
+/* 转盘轨道环（展开时显示） */
+#dial-ring {
+  position: absolute; top: 50%; left: 50%;
+  width: 190px; height: 190px; margin: -95px 0 0 -95px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(229,57,53,.25);
+  opacity: 0; transform: scale(.6);
+  transition: opacity .4s, transform .5s cubic-bezier(.34,1.4,.48,1);
+  pointer-events: none;
+}
+#dial.expanded #dial-ring { opacity: 1; transform: scale(1); }
+
+.dial-item {
+  position: absolute; top: 50%; left: 50%;
+  width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  transition: transform .6s cubic-bezier(.34,1.42,.48,1), opacity .45s, filter .4s;
+  pointer-events: none;
+}
+.dial-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dial-item .d-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,.55));
+  color: #fff; font-size: 7px; text-align: center;
+  padding: 8px 2px 3px; white-space: nowrap; overflow: hidden;
+}
+/* 选中项可点击 */
+#dial.expanded .dial-item.clickable { pointer-events: auto; cursor: pointer; }
+
+/* 红色大按钮 */
+#red-btn {
+  width: 68px; height: 68px; border-radius: 50%; flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, #ff3d3d, #d50000 70%);
+  box-shadow:
+    0 10px 30px rgba(213,0,0,.4),
+    inset 0 3px 6px rgba(255,255,255,.3),
+    inset 0 -4px 10px rgba(0,0,0,.3);
+  transition: all .15s;
+  position: relative;
+}
+#red-btn:hover { transform: scale(1.06); }
+#red-btn:active { transform: scale(.94); }
+
+/* 红色旋钮白色指示点（随风格旋转） */
+#red-pointer {
+  position: absolute; inset: 0; border-radius: 50%;
+  transform: rotate(45deg);
+  transition: transform .55s cubic-bezier(.34,1.42,.48,1);
+  pointer-events: none;
+}
+#red-pointer::before {
+  content: ''; position: absolute; top: 6px; left: 50%;
+  width: 8px; height: 8px; margin-left: -4px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+
+/* ===== 提示文字 ===== */
+#hint-text {
+  position: absolute; top: 9%; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,.35); font-size: 12px; z-index: 15;
+  letter-spacing: 1px;
+}
+
+/* 整理按钮 */
+#tidy-btn {
+  position: absolute; bottom: 28%; right: 6%;
+  color: rgba(255,255,255,.4); font-size: 12px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 16px;
+  background: rgba(255,255,255,.08); backdrop-filter: blur(8px);
+}
+
+/* ===== 生成中 ===== */
+#gen-loading {
+  position: absolute; inset: 0; z-index: 60;
+  background: rgba(0,0,0,.8); backdrop-filter: blur(10px);
+  display: none; align-items: center; justify-content: center;
+  border-radius: 32px; flex-direction: column; gap: 16px;
+}
+#gen-loading.show { display: flex; }
+.loader {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.1);
+  border-top-color: #ff3d3d;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#gen-loading span { color: rgba(255,255,255,.5); font-size: 13px; }
+
+/* ===== 结果查看 ===== */
+#result-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,.95); backdrop-filter: blur(12px);
+  display: none; align-items: center; justify-content: center; flex-direction: column; gap: 24px;
+}
+#result-overlay.show { display: flex; }
+#result-polaroid {
+  background: #fff; padding: 14px 14px 40px; border-radius: 4px;
+  box-shadow: 0 30px 100px rgba(0,0,0,.7);
+  animation: pop .5s cubic-bezier(.34,1.4,.48,1);
+}
+@keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+#result-polaroid img {
+  display: block; max-width: 50vmin; max-height: 50vmin; border-radius: 2px;
+}
+#result-polaroid .cap {
+  text-align: center; margin-top: 12px; font-size: 12px; color: rgba(0,0,0,.4);
+}
+#result-btns { display: flex; gap: 12px; }
+.r-btn {
+  padding: 10px 28px; border-radius: 24px; font-size: 13px;
+  border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.7);
+  transition: all .2s;
+}
+.r-btn:hover { background: rgba(255,255,255,.08); }
+.r-btn.red {
+  background: #d50000; border-color: transparent; color: #fff;
+}
+
+/* ===== 强度弹窗 ===== */
+#strength-modal {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+}
+#strength-modal.show { display: flex; }
+#strength-box {
+  background: #fff; border-radius: 24px; padding: 36px 52px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5);
+}
+#strength-box h3 { font-size: 12px; color: rgba(0,0,0,.4); letter-spacing: 1.5px; font-weight: 500; }
+#s-num { font-size: 48px; font-weight: 300; color: #1a1a2e; font-variant-numeric: tabular-nums; }
+#s-track { width: 240px; height: 4px; background: rgba(0,0,0,.08); border-radius: 2px; overflow: hidden; }
+#s-fill { height: 100%; background: linear-gradient(90deg, #7c4dff, #ff5252); border-radius: 2px; transition: width .12s; }
+#s-hint { font-size: 11px; color: rgba(0,0,0,.3); }
+
+/* ===== Toast ===== */
+#toast {
+  position: fixed; bottom: 40px; left: 50%; z-index: 200;
+  transform: translateX(-50%) translateY(10px);
+  background: rgba(255,255,255,.12); backdrop-filter: blur(10px);
+  padding: 10px 24px; border-radius: 24px; font-size: 12px; color: #fff;
+  opacity: 0; transition: all .3s cubic-bezier(.34,1.4,.48,1); pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== 快捷键提示 ===== */
+#kbd-hint {
+  position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%);
+  z-index: 50; font-size: 9px; color: rgba(255,255,255,.15);
+  white-space: nowrap; letter-spacing: .5px;
+}
+#kbd-hint kbd {
+  padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.1); font-size: 9px; margin-right: 3px;
+}
+
+/* ===== LIVE INPUT 硬件键盘面板 ===== */
+#live-panel {
+  position: fixed; right: 24px; bottom: 40px; z-index: 55;
+  width: 268px;
+  background: rgba(17,17,25,.72);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 22px;
+  padding: 15px 18px 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+#lp-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+#lp-head .lp-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; letter-spacing: 2.5px; color: rgba(255,255,255,.55);
+  font-weight: 500;
+}
+#lp-head .lp-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #b388ff; box-shadow: 0 0 8px rgba(179,136,255,.7);
+}
+#lp-head .lp-badge { font-size: 10px; color: rgba(255,255,255,.32); }
+
+#lp-body { display: flex; align-items: center; gap: 12px; }
+#hw-keys {
+  display: grid;
+  grid-template-columns: repeat(4, 37px);
+  grid-template-rows: repeat(2, 37px);
+  gap: 7px;
+}
+.hw-key {
+  border-radius: 9px; font-size: 11px;
+  color: rgba(255,255,255,.45);
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.07);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s, box-shadow .12s, transform .1s;
+}
+.hw-key.pressed {
+  background: rgba(255,99,71,.28);
+  border-color: rgba(255,99,71,.5);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255,99,71,.35);
+  transform: scale(.93);
+}
+
+/* 硬件旋钮 */
+#hw-knob {
+  position: relative; width: 54px; height: 54px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff3d3d, #c60000 72%);
+  box-shadow:
+    0 6px 18px rgba(198,0,0,.4),
+    inset 0 2px 5px rgba(255,255,255,.3),
+    inset 0 -3px 8px rgba(0,0,0,.3);
+  flex-shrink: 0;
+}
+#hw-pointer {
+  position: absolute; inset: 0; border-radius: 50%;
+  transform: rotate(45deg);
+  transition: transform .55s cubic-bezier(.34,1.42,.48,1);
+  pointer-events: none;
+}
+#hw-pointer::before {
+  content: ''; position: absolute; top: 5px; left: 50%;
+  width: 6px; height: 6px; margin-left: -3px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+#hw-icon {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+}
+#hw-icon svg { width: 24px; height: 24px; }
+
+#lp-foot {
+  margin-top: 14px; font-size: 11px; color: rgba(255,255,255,.42);
+}
+#lp-foot .dir { color: rgba(255,255,255,.6); }
+
+/* ===== 响应式 ===== */
+@media (max-width: 800px) {
+  #printer-card { width: 92vw; height: auto; flex-direction: column; padding: 24px; gap: 20px; }
+  .polaroid { display: none; }
+  #photo-main { display: block; width: 160px; }
+  #kbd-hint { display: none; }
+  /* 硬件面板居中贴底 */
+  #live-panel {
+    right: 50%; transform: translateX(50%);
+    bottom: 12px; width: 92vw; max-width: 340px;
+  }
+  #hw-keys {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 40px);
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<nav id="nav">
+  <div id="nav-brand">StyleCam<span>by 超级赛亚咸鱼</span></div>
+  <div id="nav-center">
+    <button class="nav-tab active" id="tab-gen" onclick="switchTab('gen')">生成</button>
+    <button class="nav-tab" id="tab-dev" onclick="switchTab('dev')">显影</button>
+  </div>
+  <div id="nav-right">
+    <button onclick="toast('菜单（演示）')">菜单</button>
+    <button id="nav-plus" onclick="toast('添加素材（演示）')">+</button>
+  </div>
+</nav>
+
+<!-- 提示文字 -->
+<div id="hint-text">放下素材，让想象发生。</div>
+
+<!-- 散落照片 -->
+<div class="polaroid" id="photo-tl1" onclick="pickStyle(0)">
+  <img src="https://picsum.photos/seed/yarn-red/300/300" alt="">
+  <div class="cap">ChatGPT Image</div>
+</div>
+<div class="polaroid" id="photo-tl2" onclick="toast('示例素材')">
+  <img src="https://picsum.photos/seed/fig-traveler/260/320" alt="">
+  <div class="cap">示例素材</div>
+</div>
+
+<!-- 中央主照片 -->
+<div class="polaroid" id="photo-main">
+  <img src="https://picsum.photos/seed/main-scene/440/560" alt="">
+</div>
+
+<div class="polaroid" id="photo-tr1" onclick="toast('示例素材')">
+  <img src="https://picsum.photos/seed/plant-photo/300/300" alt="">
+  <div class="cap">示例素材</div>
+</div>
+<div class="polaroid" id="photo-tr2" onclick="toast('未命名作品')">
+  <img src="https://picsum.photos/seed/sketch-line/280/280" alt="">
+  <div class="cap">未命名作品</div>
+</div>
+
+<!-- 底部散落照片 -->
+<div class="polaroid" id="photo-b1" onclick="pickStyle(5)">
+  <img src="https://picsum.photos/seed/paper1/220/220" alt="">
+  <div class="cap">样片 · 纸间剧场</div>
+</div>
+<div class="polaroid" id="photo-b2" onclick="pickStyle(6)">
+  <img src="https://picsum.photos/seed/chrome1/240/240" alt="">
+  <div class="cap">样片 · 液态银诗</div>
+</div>
+<div class="polaroid" id="photo-b3" onclick="pickStyle(1)">
+  <img src="https://picsum.photos/seed/blocks1/200/200" alt="">
+  <div class="cap">积木星球</div>
+</div>
+<div class="polaroid" id="photo-b4" onclick="pickStyle(8)">
+  <img src="https://picsum.photos/seed/terrarium1/260/260" alt="">
+  <div class="cap">样片 · 口袋生态舱</div>
+</div>
+<div class="polaroid" id="photo-b5" onclick="pickStyle(5)">
+  <img src="https://picsum.photos/seed/paper2/240/240" alt="">
+  <div class="cap">样片 · 纸间剧场</div>
+</div>
+<div class="polaroid" id="photo-b6" onclick="pickStyle(0)">
+  <img src="https://picsum.photos/seed/yarn2/230/230" alt="">
+  <div class="cap">样片 · 毛线旅行家</div>
+</div>
+<div class="polaroid" id="photo-b7" onclick="pickStyle(6)">
+  <img src="https://picsum.photos/seed/chrome2/250/250" alt="">
+  <div class="cap">样片 · 液态银诗</div>
+</div>
+
+<!-- 中央白色打印机卡片 -->
+<div id="printer-card">
+  <div id="printer-info">
+    <div id="status-dot">
+      <div class="led"></div>
+      <span class="en-label" id="en-label">YARN DOLL</span>
+    </div>
+    <h2 id="style-title">毛线旅行家</h2>
+    <p id="style-desc">把熟悉的人与物，织成掌心里的温柔。</p>
+    <div id="printer-links">
+      <button class="p-link" onclick="showPrompt()">
+        查看提示词
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="p-link" onclick="toast('导出 Skill（演示）')">
+        导出 Skill
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 圆形转盘：图片围绕旋钮，红色按钮在中心 -->
+  <div id="dial">
+    <div id="dial-ring"></div>
+    <!-- dial-item 由 JS 生成 -->
+    <button id="red-btn" onclick="generate()">
+      <span id="red-pointer"></span>
+    </button>
+  </div>
+
+  <!-- 生成中 -->
+  <div id="gen-loading">
+    <div class="loader"></div>
+    <span>正在生成...</span>
+  </div>
+</div>
+
+<button id="tidy-btn" onclick="toast('已整理布局')">整理 ↔</button>
+
+<!-- 强度弹窗 -->
+<div id="strength-modal">
+  <div id="strength-box">
+    <h3>创意强度</h3>
+    <div id="s-num">65</div>
+    <div id="s-track"><div id="s-fill" style="width:65%"></div></div>
+    <div id="s-hint">← → 调节 · Enter 确认</div>
+  </div>
+</div>
+
+<!-- 结果查看 -->
+<div id="result-overlay">
+  <div id="result-polaroid">
+    <img id="result-img" src="">
+    <div class="cap" id="result-cap"></div>
+  </div>
+  <div id="result-btns">
+    <button class="r-btn" onclick="closeResult()">收起 S4</button>
+    <button class="r-btn red" onclick="saveResult()">保存 S3</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="kbd-hint">
+  <kbd>←</kbd><kbd>→</kbd> 切换风格 &nbsp;·&nbsp; <kbd>1</kbd>强度 &nbsp;·&nbsp; <kbd>3</kbd>保存 &nbsp;·&nbsp; <kbd>Enter</kbd> 生成
+</div>
+
+<!-- LIVE INPUT 硬件键盘面板 -->
+<div id="live-panel">
+  <div id="lp-head">
+    <div class="lp-title"><span class="lp-dot"></span>LIVE INPUT</div>
+    <span class="lp-badge">课堂演示</span>
+  </div>
+  <div id="lp-body">
+    <div id="hw-keys">
+      <button class="hw-key" data-k="1">S1</button>
+      <button class="hw-key" data-k="2">S2</button>
+      <button class="hw-key" data-k="3">S3</button>
+      <button class="hw-key" data-k="4">S4</button>
+      <button class="hw-key" data-k="5">S5</button>
+      <button class="hw-key" data-k="6">S6</button>
+      <button class="hw-key" data-k="7">S7</button>
+      <button class="hw-key" data-k="8">S8</button>
+    </div>
+    <div id="hw-knob">
+      <span id="hw-pointer"></span>
+      <span id="hw-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+          <path d="M20 12a8 8 0 1 1-2.34-5.66"/>
+          <path d="M20 3v4h-4"/>
+        </svg>
+      </span>
+    </div>
+  </div>
+  <div id="lp-foot"><span class="dir" id="lp-dir">顺时针</span> · <span id="lp-style">毛线旅行家</span></div>
+</div>
+
+<script>
+// ===== 10 种风格 =====
+const STYLES = [
+  { en:'YARN DOLL',      name:'毛线旅行家', desc:'把熟悉的人与物，织成掌心里的温柔。', seed:'yarn-thumb' },
+  { en:'BRICK PLANET',   name:'积木星球',   desc:'一块一块，搭出另一个宇宙。',       seed:'blocks-thumb' },
+  { en:'MECHA KIT',      name:'机甲模型盒', desc:'把日常，装配成未来收藏品。',       seed:'mecha-thumb' },
+  { en:'PIXEL DREAM',    name:'掌上像素梦', desc:'把你的世界，装进一台小小掌机。',   seed:'retro-thumb' },
+  { en:'CLAY BLIND BOX', name:'软陶盲盒',   desc:'捏一份柔软的、可以收藏的想象。',   seed:'clay-thumb' },
+  { en:'PAPER THEATRE',  name:'纸间剧场',   desc:'折叠光影，让画面站起来。',         seed:'paper-thumb' },
+  { en:'LIQUID SILVER',  name:'液态银诗',   desc:'让轮廓流动，让光成为颜色。',       seed:'chrome-thumb' },
+  { en:'GUMMY COSMOS',   name:'果冻宇宙',   desc:'给世界一点透明、轻盈和弹性。',     seed:'jelly-thumb' },
+  { en:'POCKET ECO',     name:'口袋生态舱', desc:'把一个小世界，藏进玻璃球。',       seed:'terrarium-thumb' },
+  { en:'RISOGRAPH',      name:'孔版夏日',   desc:'留住油墨颗粒里的夏天。',           seed:'riso-thumb' },
+];
+
+const S = {
+  idx: 0, strength: 65, busy: false, adjusting: false,
+  currentWork: null, mode: 'gen', expanded: false,
+};
+
+const $ = id => document.getElementById(id);
+const R = 92;    // 转盘圆周半径
+const STEP = 36;  // 每项间隔角度（360/10）
+
+// 构建圆形转盘
+function buildDial() {
+  const dial = $('dial');
+  dial.querySelectorAll('.dial-item').forEach(n => n.remove());
+  STYLES.forEach((st, i) => {
+    const item = document.createElement('div');
+    item.className = 'dial-item';
+    item.innerHTML = `
+      <img src="https://picsum.photos/seed/${st.seed}/160/160" alt="">
+      <div class="d-label">${st.name}</div>
+    `;
+    item.onclick = () => { pickStyle(i); expandDial(); };
+    dial.appendChild(item);
+  });
+  renderDial();
+}
+
+// 环形最短距离
+function ringOff(i) {
+  const N = STYLES.length;
+  let off = i - S.idx;
+  if (off > N / 2) off -= N;
+  if (off < -N / 2) off += N;
+  return off;
+}
+
+// 更新转盘
+function renderDial() {
+  const items = document.querySelectorAll('.dial-item');
+  items.forEach((item, i) => {
+    const off = ringOff(i);
+    const dist = Math.abs(off);
+    let tf, op, z, filt, clickable;
+
+    if (S.expanded) {
+      // 展开：沿圆周分布，选中项停在正上方(-90°)
+      const angle = -90 + off * STEP;
+      const s = dist === 0 ? 1.3 : dist === 1 ? .95 : dist === 2 ? .82 : dist === 3 ? .72 : .64;
+      tf = `rotate(${angle}deg) translate(${R}px) rotate(${-angle}deg) scale(${s})`;
+      op = 1 - dist * .13;
+      z = 20 - dist;
+      filt = dist === 0 ? 'none' : `blur(${dist * .35}px) brightness(${1 - dist * .05})`;
+      clickable = dist <= 2;
+    } else {
+      // 收拢：选中项移到旋钮左侧作预览，其余缩到中心
+      if (off === 0) {
+        tf = `translate(-104px,0) scale(1.5)`; op = 1; z = 15; filt = 'none';
+      } else {
+        tf = `scale(0)`; op = 0; z = 0; filt = 'none';
+      }
+      clickable = false;
+    }
+    item.style.transform = tf;
+    item.style.opacity = op;
+    item.style.zIndex = z;
+    item.style.filter = filt;
+    item.classList.toggle('clickable', clickable);
+  });
+
+  // 红色旋钮白点随风格转动（每档36°，初始45°）
+  const rp = $('red-pointer');
+  if (rp) rp.style.transform = `rotate(${45 + S.idx * 36}deg)`;
+  // 硬件面板同步
+  const hp = $('hw-pointer');
+  if (hp) hp.style.transform = `rotate(${45 + S.idx * 36}deg)`;
+  const ls = $('lp-style');
+  if (ls) ls.textContent = STYLES[S.idx].name;
+}
+
+function pickStyle(i) {
+  S.idx = ((i % STYLES.length) + STYLES.length) % STYLES.length;
+  const st = STYLES[S.idx];
+  $('en-label').textContent = st.en;
+  $('style-title').textContent = st.name;
+  $('style-desc').textContent = st.desc;
+  renderDial();
+}
+
+let collapseTimer;
+function expandDial() {
+  S.expanded = true;
+  $('dial').classList.add('expanded');
+  renderDial();
+  clearTimeout(collapseTimer);
+  collapseTimer = setTimeout(collapseDial, 2200);
+}
+function collapseDial() {
+  S.expanded = false;
+  $('dial').classList.remove('expanded');
+  renderDial();
+}
+
+function rotate(d) {
+  if (S.busy) return;
+  if (S.adjusting) {
+    S.strength = Math.max(10, Math.min(100, S.strength + d * 5));
+    $('s-num').textContent = S.strength;
+    $('s-fill').style.width = S.strength + '%';
+    return;
+  }
+  // 更新硬件面板方向
+  const ld = $('lp-dir');
+  if (ld) ld.textContent = d > 0 ? '顺时针' : '逆时针';
+  pickStyle(S.idx + d);
+  expandDial();
+}
+
+function generate() {
+  if (S.busy) return;
+  S.busy = true;
+  $('gen-loading').classList.add('show');
+
+  setTimeout(() => {
+    const st = STYLES[S.idx];
+    const imgUrl = `https://picsum.photos/seed/${st.seed}-result/600/600`;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      $('gen-loading').classList.remove('show');
+      S.busy = false;
+      S.currentWork = { url: imgUrl, name: st.name, strength: S.strength };
+      $('result-img').src = imgUrl;
+      $('result-cap').textContent = st.name + ' · 强度 ' + S.strength;
+      $('result-overlay').classList.add('show');
+    };
+    img.onerror = () => {
+      $('gen-loading').classList.remove('show');
+      S.busy = false;
+      // fallback: 直接用URL
+      S.currentWork = { url: imgUrl, name: st.name, strength: S.strength };
+      $('result-img').src = imgUrl;
+      $('result-cap').textContent = st.name + ' · 强度 ' + S.strength;
+      $('result-overlay').classList.add('show');
+    };
+    img.src = imgUrl;
+  }, 1400);
+}
+
+function closeResult() {
+  $('result-overlay').classList.remove('show');
+}
+
+function saveResult() {
+  if (!S.currentWork) return;
+  const a = document.createElement('a');
+  a.href = S.currentWork.url;
+  a.download = 'stylecam-' + Date.now() + '.jpg';
+  a.target = '_blank';
+  a.click();
+  toast('已保存');
+  closeResult();
+}
+
+function showPrompt() {
+  toast('提示词面板（演示）');
+}
+
+function switchTab(t) {
+  S.mode = t;
+  $('tab-gen').classList.toggle('active', t === 'gen');
+  $('tab-dev').classList.toggle('active', t === 'dev');
+  toast(t === 'gen' ? '风格生成模式' : '创意显影模式');
+}
+
+// 强度
+function openStrength() {
+  S.adjusting = true;
+  $('s-num').textContent = S.strength;
+  $('s-fill').style.width = S.strength + '%';
+  $('strength-modal').classList.add('show');
+}
+function closeStrength() {
+  S.adjusting = false;
+  $('strength-modal').classList.remove('show');
+}
+
+// Toast
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ===== 硬件面板联动 =====
+const DIGIT_TO_S = {
+  Digit1:1,Numpad1:1, Digit2:2,Numpad2:2, Digit3:3,Numpad3:3, Digit4:4,Numpad4:4,
+  Digit5:5,Numpad5:5, Digit6:6,Numpad6:6, Digit7:7,Numpad7:7, Digit8:8,Numpad8:8,
+};
+function hwKeyEl(n) { return document.querySelector(`.hw-key[data-k="${n}"]`); }
+function pressHw(n) { const b = hwKeyEl(n); if (b) b.classList.add('pressed'); }
+function releaseHw(n) { const b = hwKeyEl(n); if (b) b.classList.remove('pressed'); }
+function flashHw(n) { pressHw(n); setTimeout(() => releaseHw(n), 160); }
+
+// S1~S8 功能
+function hwAction(n) {
+  switch (n) {
+    case 1: openStrength(); break;
+    case 2: toast('查看模式'); break;
+    case 3: saveResult(); break;
+    case 4: closeResult(); break;
+    case 5: toast('对比原图'); break;
+    case 6: toast('AI 灵感'); break;
+    case 7: S.strength = 65; toast('已重置'); break;
+    case 8: switchTab(S.mode === 'gen' ? 'dev' : 'gen'); break;
+  }
+}
+
+// 硬件按键点击
+document.querySelectorAll('.hw-key').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const n = +btn.dataset.k;
+    flashHw(n);
+    hwAction(n);
+  });
+});
+
+// ===== 键盘 =====
+document.addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  // S1~S8 数字键：高亮硬件键并触发功能
+  if (e.code in DIGIT_TO_S) {
+    e.preventDefault();
+    const n = DIGIT_TO_S[e.code];
+    pressHw(n);
+    if (!e.repeat) hwAction(n);
+    return;
+  }
+  switch (e.code) {
+    case 'ArrowLeft': e.preventDefault(); rotate(-1); break;
+    case 'ArrowRight': e.preventDefault(); rotate(1); break;
+    case 'Enter': e.preventDefault(); if (!e.repeat) {
+      if (S.adjusting) closeStrength(); else generate();
+    } break;
+    case 'Escape': closeStrength(); closeResult(); break;
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code in DIGIT_TO_S) releaseHw(DIGIT_TO_S[e.code]);
+});
+
+// 点击弹窗外关闭
+$('strength-modal').addEventListener('click', e => {
+  if (e.target.id === 'strength-modal') closeStrength();
+});
+
+// 初始化圆形转盘
+buildDial();
+</script>
+</body>
+</html>
